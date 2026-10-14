@@ -2,6 +2,7 @@
 
 App web sencilla para rellenar cada día el registro de alimentación, movimiento, descanso y señales del cuerpo, y generar el documento con el mismo formato (A4, imprimible o PDF).
 
+- **Perfiles** Javier Alcaraz y Noelia Herreros (selector arriba): cada uno con sus días, sugerencias y copia de seguridad; el nombre sale en el documento.
 - **Paso a paso** (una pregunta cada vez) o **Todo junto** (formulario completo).
 - Autoguardado por día en el propio móvil (localStorage) + botón *Guardar*. Los datos no salen del dispositivo.
 - Sugerencias con lo que más/últimamente has escrito en cada campo.

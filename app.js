@@ -3,6 +3,10 @@
 'use strict';
 
 const PREFIX = 'vb-registro:';
+const PERFILES = [
+  { id: 'javier', nombre: 'Javier Alcaraz' },
+  { id: 'noelia', nombre: 'Noelia Herreros' },
+];
 const SETTINGS = 'vb-ajustes';
 const DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
@@ -90,7 +94,7 @@ function allDays() {
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k.startsWith(PREFIX)) out.push(k.slice(PREFIX.length));
+      if (k.startsWith(pre())) out.push(k.slice(pre().length));
     }
   } catch { /* sin almacenamiento */ }
   return out.sort();
@@ -102,6 +106,18 @@ let data = {};
 let step = 0;
 let mode = load(SETTINGS, {}).mode || 'wizard';
 let settings = Object.assign({ watermark: true }, load(SETTINGS, {}));
+let perfil = PERFILES.some((p) => p.id === settings.perfil) ? settings.perfil : PERFILES[0].id;
+const pre = () => PREFIX + perfil + ':';
+const nombrePerfil = () => PERFILES.find((p) => p.id === perfil).nombre;
+
+// Días guardados antes de existir los perfiles: pasan al primer perfil
+try {
+  Object.keys(localStorage).filter((k) => /^vb-registro:\d{4}-/.test(k)).forEach((k) => {
+    const nk = PREFIX + PERFILES[0].id + ':' + k.slice(PREFIX.length);
+    if (!localStorage.getItem(nk)) localStorage.setItem(nk, localStorage.getItem(k));
+    localStorage.removeItem(k);
+  });
+} catch { /* sin almacenamiento */ }
 let dirty = false;
 let saveTimer = null;
 let suggestCache = null;
@@ -184,7 +200,7 @@ function isEmpty(d) { return FIELDS.every((f) => !d[f.id] || (f.id === 'dia' && 
 function save(manual) {
   clearTimeout(saveTimer);
   data = readForm();
-  const key = PREFIX + fecha;
+  const key = pre() + fecha;
   if (isEmpty(data) && !manual) { try { localStorage.removeItem(key); } catch { /* */ } }
   else { data.actualizado = new Date().toISOString(); if (!store(key, data)) { setState('⚠ No se pudo guardar', true); return; } }
   dirty = false; suggestCache = null;
@@ -211,7 +227,7 @@ function openDay(f) {
   if (dirty) save(false);
   fecha = f;
   $('#fecha').value = fecha;
-  data = load(PREFIX + fecha, null) || { dia: DIAS[parseIso(fecha).getDay()] };
+  data = load(pre() + fecha, null) || { dia: DIAS[parseIso(fecha).getDay()] };
   fillForm(data);
   suggestCache = null;
   renderChips();
@@ -229,7 +245,7 @@ function buildSuggest() {
   const stats = {};
   const days = allDays().filter((d) => d !== fecha);
   days.forEach((day, idx) => {
-    const d = load(PREFIX + day, {});
+    const d = load(pre() + day, {});
     for (const f of FIELDS) {
       if (f.type === 'choice' || f.type === 'scale' || f.type === 'number' || f.type === 'agua' || f.id === 'dia') continue;
       const v = d[f.id]; if (!v) continue;
@@ -287,6 +303,18 @@ form.addEventListener('click', (e) => {
   el.focus();
   const n = el.value.length; try { el.setSelectionRange(n, n); } catch { /* */ }
 });
+
+/* ---------- Perfil ---------- */
+const selPerfil = $('#perfil');
+selPerfil.innerHTML = PERFILES.map((p) => `<option value="${p.id}">${esc(p.nombre)}</option>`).join('');
+selPerfil.value = perfil;
+selPerfil.onchange = () => {
+  if (dirty) save(false);
+  perfil = selPerfil.value;
+  settings.perfil = perfil; store(SETTINGS, settings);
+  openDay(fecha);
+  toast(`Perfil: ${nombrePerfil()}`);
+};
 
 /* ---------- Asistente paso a paso ---------- */
 function showStep(focus = true) {
@@ -362,11 +390,11 @@ $('#optWatermark').onchange = (e) => { settings.watermark = e.target.checked; st
 $('#exportBtn').onclick = () => {
   if (dirty) save(false);
   const all = {};
-  for (const d of allDays()) all[d] = load(PREFIX + d, {});
-  const blob = new Blob([JSON.stringify({ app: 'registro-matrona', version: 1, dias: all }, null, 1)], { type: 'application/json' });
+  for (const d of allDays()) all[d] = load(pre() + d, {});
+  const blob = new Blob([JSON.stringify({ app: 'registro-matrona', version: 2, perfil, nombre: nombrePerfil(), dias: all }, null, 1)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `registro-copia-${iso(new Date())}.json`;
+  a.download = `registro-${perfil}-copia-${iso(new Date())}.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 };
@@ -376,8 +404,8 @@ $('#importFile').onchange = async (e) => {
     const j = JSON.parse(await file.text());
     const dias = j.dias || {};
     let n = 0;
-    for (const d in dias) if (/^\d{4}-\d{2}-\d{2}$/.test(d)) { store(PREFIX + d, dias[d]); n++; }
-    toast(`Restaurados ${n} días`);
+    for (const d in dias) if (/^\d{4}-\d{2}-\d{2}$/.test(d)) { store(pre() + d, dias[d]); n++; }
+    toast(`Restaurados ${n} días en ${nombrePerfil()}`);
     openDay(fecha);
   } catch { toast('El archivo no es una copia válida'); }
   e.target.value = '';
@@ -385,7 +413,7 @@ $('#importFile').onchange = async (e) => {
 };
 $('#clearDay').onclick = () => {
   if (!confirm(`¿Vaciar todos los datos del ${fmtFecha(fecha)}?`)) return;
-  try { localStorage.removeItem(PREFIX + fecha); } catch { /* */ }
+  try { localStorage.removeItem(pre() + fecha); } catch { /* */ }
   dirty = false;
   openDay(fecha);
   dlg.close();
@@ -419,6 +447,7 @@ function renderDoc() {
       <div class="drole">Matrona Integrativa</div>
       <div class="dcol">Nº Colegiado 15 375</div>
     </header>
+    <p class="dline"><b>Nombre:</b> <span class="fill">${esc(nombrePerfil())}</span></p>
     <p class="dline"><b>Día:</b> ${blank(v(d, 'dia'), 8)} &nbsp; | &nbsp; <b>Fecha:</b> ${fmtFecha(fecha)}</p>
 
     <h2>Alimentación y digestión</h2>
@@ -464,7 +493,7 @@ window.addEventListener('beforeprint', () => { $('#doc').style.zoom = 1; });
 window.addEventListener('afterprint', () => { if (!$('#docView').hidden) fitDoc(); });
 $('#genBtn').onclick = () => showDoc(true);
 $('#docBack').onclick = () => showDoc(false);
-$('#printBtn').onclick = () => { document.title = `Registro ${fmtFecha(fecha).replace(/\//g, '-')}`; window.print(); };
+$('#printBtn').onclick = () => { document.title = `Registro ${nombrePerfil()} ${fmtFecha(fecha).replace(/\//g, '-')}`; window.print(); };
 window.addEventListener('afterprint', () => { document.title = 'Registro diario · Vanesa Ballester'; });
 
 function loadScript(src) {
@@ -479,7 +508,7 @@ $('#pdfBtn').onclick = async () => {
     el.classList.add('pdfmode');
     await window.html2pdf().set({
       margin: 0,
-      filename: `Registro-${fmtFecha(fecha).replace(/\//g, '-')}.pdf`,
+      filename: `Registro-${nombrePerfil().replace(/ /g, '-')}-${fmtFecha(fecha).replace(/\//g, '-')}.pdf`,
       image: { type: 'jpeg', quality: 0.95 },
       html2canvas: { scale: 2, useCORS: true, windowWidth: 820 },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },

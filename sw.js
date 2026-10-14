@@ -1,5 +1,5 @@
 // Caché sencilla para que la app funcione sin conexión
-const CACHE = 'registro-vb-v1';
+const CACHE = 'registro-vb-v2';
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', (e) => {
