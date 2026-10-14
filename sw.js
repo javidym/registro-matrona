@@ -1,6 +1,7 @@
 // Caché sencilla para que la app funcione sin conexión
-const CACHE = 'registro-vb-v2';
-const FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
+const CACHE = 'registro-vb-v3';
+const FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png',
+  'pdf.js', 'lib/jspdf.umd.min.js', 'lib/jspdf.plugin.autotable.min.js'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));

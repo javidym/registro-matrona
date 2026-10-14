@@ -489,7 +489,13 @@ function fitDoc() {
   el.style.zoom = Math.min(1, (document.documentElement.clientWidth - 8) / el.offsetWidth);
 }
 window.addEventListener('resize', () => { if (!$('#docView').hidden) fitDoc(); });
-window.addEventListener('beforeprint', () => { $('#doc').style.zoom = 1; });
+// Al imprimir, el documento se encoge si hace falta para que quepa en una sola cara A4
+window.addEventListener('beforeprint', () => {
+  const el = $('#doc');
+  el.style.zoom = 1;
+  const alto = el.scrollHeight, a4 = el.offsetWidth * 297 / 210;
+  el.style.zoom = alto > a4 - 10 ? (a4 * 0.97) / alto : 1;
+});
 window.addEventListener('afterprint', () => { if (!$('#docView').hidden) fitDoc(); });
 $('#genBtn').onclick = () => showDoc(true);
 $('#docBack').onclick = () => showDoc(false);
@@ -503,20 +509,14 @@ $('#pdfBtn').onclick = async () => {
   const btn = $('#pdfBtn'); const old = btn.textContent;
   btn.disabled = true; btn.textContent = 'Generando…';
   try {
-    if (!window.html2pdf) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
-    const el = $('#doc');
-    el.classList.add('pdfmode');
-    await window.html2pdf().set({
-      margin: 0,
-      filename: `Registro-${nombrePerfil().replace(/ /g, '-')}-${fmtFecha(fecha).replace(/\//g, '-')}.pdf`,
-      image: { type: 'jpeg', quality: 0.95 },
-      html2canvas: { scale: 2, useCORS: true, windowWidth: 820 },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['avoid-all'] },
-    }).from(el).save();
-    el.classList.remove('pdfmode');
+    if (!window.jspdf) await loadScript('lib/jspdf.umd.min.js');
+    if (!window.jspdf.jsPDF.API.autoTable) await loadScript('lib/jspdf.plugin.autotable.min.js');
+    if (!window.generarPdf) await loadScript('pdf.js');
+    const doc = await generarPdf(readForm(), { nombre: nombrePerfil(), fecha: fmtFecha(fecha), marcaAgua: settings.watermark ? WATERMARK : null });
+    doc.save(`Registro-${nombrePerfil().replace(/ /g, '-')}-${fmtFecha(fecha).replace(/\//g, '-')}.pdf`);
   } catch (err) {
-    toast('No se pudo crear el PDF (¿sin conexión?). Usa "Imprimir / Guardar PDF".');
+    console.error(err);
+    toast('No se pudo crear el PDF. Prueba con "Imprimir / Guardar PDF".');
   }
   btn.disabled = false; btn.textContent = old;
 };

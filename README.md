@@ -14,4 +14,4 @@ App web sencilla para rellenar cada día el registro de alimentación, movimient
 - **Android (Chrome):** abre la web → menú ⋮ → *Añadir a pantalla de inicio* / *Instalar aplicación*.
 - **iPhone (Safari):** abre la web → botón Compartir → *Añadir a pantalla de inicio*.
 
-Funciona sin conexión una vez abierta (la descarga directa de PDF necesita internet la primera vez; *Imprimir / Guardar PDF* funciona siempre).
+Funciona sin conexión una vez abierta. *Descargar PDF* crea un A4 real que siempre cabe en una sola cara (reduce la letra si hay mucho texto); *Imprimir* también ajusta a una cara.

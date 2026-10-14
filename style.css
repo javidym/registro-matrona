@@ -176,7 +176,6 @@ dialog button, .filebtn { display: block; width: 100%; margin: 8px 0; text-align
   font-family: system-ui, sans-serif; font-size: 9.5pt;
   background: repeating-linear-gradient(transparent 0 7.4mm, #eadfd4 7.4mm 7.6mm);
 }
-.a4.pdfmode { box-shadow: none; zoom: 1 !important; margin: 0; min-height: 286mm; }
 
 /* ---------- Impresión ---------- */
 @page { size: A4; margin: 0; }
@@ -185,6 +184,6 @@ dialog button, .filebtn { display: block; width: 100%; margin: 8px 0; text-align
   #app, .doctools, #toast { display: none !important; }
   #docView { display: block !important; }
   .docscroll { padding: 0; overflow: visible; }
-  .a4 { zoom: 1 !important; box-shadow: none; margin: 0; width: 210mm; min-height: 286mm; page-break-after: avoid; }
+  .a4 { box-shadow: none; margin: 0; width: 210mm; min-height: 286mm; page-break-after: avoid; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
