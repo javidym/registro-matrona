@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Registro diario · Vanesa Ballester</title>
+<meta name="description" content="Registro diario de alimentación, movimiento, descanso y señales del cuerpo.">
+<meta name="theme-color" content="#c98b8f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Registro VB">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ===================== APP ===================== -->
+<div id="app">
+  <header class="top">
+    <div class="brand">
+      <span class="logo">VB</span>
+      <div>
+        <strong>Registro diario</strong>
+        <small>Vanesa Ballester · Matrona Integrativa</small>
+      </div>
+      <span id="saveState" class="savestate">—</span>
+    </div>
+    <div class="dayrow">
+      <button type="button" class="icon" id="prevDay" aria-label="Día anterior">‹</button>
+      <input type="date" id="fecha" aria-label="Fecha del registro">
+      <button type="button" class="icon" id="nextDay" aria-label="Día siguiente">›</button>
+    </div>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" data-mode="wizard" class="on">Paso a paso</button>
+      <button type="button" role="tab" data-mode="form">Todo junto</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="progress" class="progress"><div></div></div>
+    <form id="form" autocomplete="off" class="wizard"></form>
+
+    <nav id="wizNav" class="wiznav">
+      <button type="button" id="back" class="ghost">‹ Atrás</button>
+      <span id="stepInfo"></span>
+      <button type="button" id="next" class="primary">Siguiente ›</button>
+    </nav>
+  </main>
+
+  <footer class="bottom">
+    <button type="button" id="saveBtn">Guardar</button>
+    <button type="button" id="genBtn" class="primary">Generar documento</button>
+    <button type="button" id="moreBtn" class="icon" aria-label="Más opciones">⋯</button>
+  </footer>
+
+  <dialog id="moreDlg">
+    <h3>Opciones</h3>
+    <label class="check"><input type="checkbox" id="optWatermark" checked> Marca de agua en el documento</label>
+    <p class="muted">Tus datos se guardan solo en este móvil. Haz copia de vez en cuando:</p>
+    <button type="button" id="exportBtn">Descargar copia de seguridad</button>
+    <label class="filebtn">Restaurar copia<input type="file" id="importFile" accept="application/json,.json"></label>
+    <button type="button" id="clearDay" class="danger">Vaciar este día</button>
+    <p class="muted" id="daysCount"></p>
+    <button type="button" id="closeMore" class="primary">Cerrar</button>
+  </dialog>
+</div>
+
+<!-- ===================== DOCUMENTO ===================== -->
+<div id="docView" hidden>
+  <div class="doctools">
+    <button type="button" id="docBack" class="ghost">‹ Volver</button>
+    <button type="button" id="printBtn" class="primary">Imprimir / Guardar PDF</button>
+    <button type="button" id="pdfBtn">Descargar PDF</button>
+  </div>
+  <div class="docscroll"><article id="doc" class="a4"></article></div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
