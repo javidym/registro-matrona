@@ -1,5 +1,5 @@
 // Caché sencilla para que la app funcione sin conexión
-const CACHE = 'registro-vb-v4';
+const CACHE = 'registro-vb-v5';
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png',
   'pdf.js', 'lib/jspdf.umd.min.js', 'lib/jspdf.plugin.autotable.min.js'];
 

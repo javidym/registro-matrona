@@ -189,3 +189,33 @@ dialog button, .filebtn { display: block; width: 100%; margin: 8px 0; text-align
   .a4 { box-shadow: none; margin: 0 auto; zoom: .94 !important; break-after: avoid; break-inside: avoid; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* ---------- Ciclo menstrual ---------- */
+.off { display: none !important; }
+.cal { margin-top: 12px; }
+.calhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.calhead strong { font-family: Georgia, serif; color: var(--rosa); }
+.caltab { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.caltab th { font-size: .75rem; color: var(--suave); font-weight: 600; padding: 2px 0; }
+.caltab td { padding: 2px; text-align: center; }
+.cal .caltab button {
+  width: 100%; aspect-ratio: 1; min-height: 38px; padding: 0; border-radius: 50%;
+  background: var(--beige-2); border-color: var(--borde); font-size: .95rem;
+}
+.cal .caltab button.regla { background: var(--rosa); border-color: var(--rosa); color: #fff; font-weight: 600; }
+.cal .caltab button.hoy { outline: 2px solid var(--tinta); outline-offset: 1px; }
+.calley { font-size: .8rem; color: var(--suave); margin: 8px 0 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: middle; }
+.sw.regla { background: var(--rosa); }
+.sw.hoy { border: 2px solid var(--tinta); }
+
+.a4 .ciclo { display: flex; justify-content: space-between; gap: 6mm; align-items: flex-start; }
+.a4 .calmini { width: 46mm; flex: none; }
+.a4 .calmes { text-align: center; font-size: 9.5pt; color: #b77a7f; font-weight: 600; margin-bottom: 1mm; }
+.a4 .caltab th { background: rgba(239, 228, 212, .8); color: #3d302c; font-size: 7.5pt; padding: .6mm 0; border: 1px solid #cdb8a8; }
+.a4 .caltab td { height: auto; border: 1px solid #cdb8a8; font-size: 7.5pt; padding: .6mm 0; font-family: system-ui, sans-serif; }
+.a4 .caltab td.regla { background: #b77a7f; color: #fff; }
+.a4 .caltab td.hoy { outline: 1.5px solid #3d302c; outline-offset: -2px; font-weight: 700; }
+.a4 .calley { font-size: 8.5pt; }
+.a4 .sw.hoy { border-color: #3d302c; }
+.a4 .sw.regla { background: #b77a7f; }

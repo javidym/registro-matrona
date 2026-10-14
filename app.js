@@ -35,11 +35,16 @@ const SEC = {
   act: 'Actividad física y movimiento',
   desc: 'Descanso y estado nervioso',
   obs: 'Señales del cuerpo y observaciones',
+  ciclo: 'Ciclo menstrual',
 };
 
 /* ---------- Definición de campos (orden = orden del asistente) ---------- */
 const FIELDS = [
   { id: 'dia', sec: 'dia', label: 'Día', ask: '¿Qué día es?', hint: 'Día de la semana o nº de día del registro.' },
+  // Solo para Noelia, a partir del 16/10/2026
+  { id: 'ciclo', sec: 'ciclo', label: 'Día del ciclo', ask: '¿En qué día del ciclo estás?', type: 'ciclo',
+    perfil: 'noelia', desde: '2026-10-16',
+    hint: 'Toca en el calendario el día en que empezó tu regla (o todos los días de regla) y se calcula solo. También puedes escribirlo.' },
 ];
 for (const [mk, mname] of COMIDAS) {
   for (const c of COLS) {
@@ -138,6 +143,8 @@ function inputHtml(f) {
     case 'choice':
       return `<div class="choices">${f.options.map((o) =>
         `<label><input type="radio" name="${f.id}" value="${esc(o)}"><span>${esc(o)}</span></label>`).join('')}</div>`;
+    case 'ciclo':
+      return `<input type="number" inputmode="numeric" min="1" max="99" ${name}><div class="cal" data-cal></div>`;
     case 'scale':
       return `<div class="choices scale">${Array.from({ length: 11 }, (_, i) =>
         `<label><input type="radio" name="${f.id}" value="${i}"><span>${i}</span></label>`).join('')}</div>`;
@@ -230,10 +237,15 @@ function openDay(f) {
   $('#fecha').value = fecha;
   data = load(pre() + fecha, null) || { dia: DIAS[parseIso(fecha).getDay()] };
   fillForm(data);
+  aplicarActivos();
+  calMes = fecha.slice(0, 7);
+  if (cicloActivo() && !data.ciclo) { const c = diaCiclo(fecha); if (c) setVal('ciclo', c.dia); }
+  renderCal();
   suggestCache = null;
   renderChips();
-  const firstEmpty = FIELDS.findIndex((x) => !data[x.id]);
-  step = firstEmpty < 0 ? FIELDS.length - 1 : firstEmpty;
+  const act = activos();
+  const firstEmpty = act.find((i) => !data[FIELDS[i].id]);
+  step = firstEmpty ?? act[act.length - 1];
   showStep(false);
   setState(data.actualizado ? 'Guardado' : 'Nuevo día');
 }
@@ -256,7 +268,7 @@ function buildSuggest() {
     const d = day === fecha ? readForm() : load(pre() + day, {});
     const r = (idx + 1) / days.length; // más reciente = más peso
     for (const f of FIELDS) {
-      if (f.type === 'choice' || f.type === 'scale' || f.type === 'number' || f.type === 'agua' || f.id === 'dia') continue;
+      if (['choice', 'scale', 'number', 'agua', 'ciclo'].includes(f.type) || f.id === 'dia') continue;
       const v = d[f.id]; if (!v) continue;
       const items = f.split ? v.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean) : [v.trim()];
       for (const it of items) {
@@ -329,14 +341,97 @@ selPerfil.onchange = () => {
   toast(`Perfil: ${nombrePerfil()}`);
 };
 
+/* ---------- Preguntas que solo aplican a un perfil o desde una fecha ---------- */
+const activo = (f) => (!f.perfil || f.perfil === perfil) && (!f.desde || fecha >= f.desde);
+const activos = () => FIELDS.map((f, i) => i).filter((i) => activo(FIELDS[i]));
+const cicloActivo = () => activo(FIELDS.find((f) => f.id === 'ciclo'));
+function aplicarActivos() {
+  $$('.q', form).forEach((q) => q.classList.toggle('off', !activo(FIELDS[+q.dataset.i])));
+  $$('.sec', form).forEach((s) => s.classList.toggle('off', !$('.q:not(.off)', s)));
+}
+
+/* ---------- Ciclo menstrual ---------- */
+const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+let calMes = fecha.slice(0, 7);
+const cicloKey = () => 'vb-ciclo:' + perfil;
+const diasRegla = () => new Set(load(cicloKey(), { regla: [] }).regla);
+const sumaDias = (s, n) => { const d = parseIso(s); d.setDate(d.getDate() + n); return iso(d); };
+
+// Día del ciclo = días desde el primer día de la última regla (día 1 = inicio de la regla)
+function diaCiclo(f) {
+  const regla = diasRegla();
+  for (let s = f, n = 0; n < 120; n++, s = sumaDias(s, -1)) {
+    if (!regla.has(s)) continue;
+    let inicio = s;
+    while (regla.has(sumaDias(inicio, -1))) inicio = sumaDias(inicio, -1);
+    return { dia: Math.round((parseIso(f) - parseIso(inicio)) / 864e5) + 1, inicio };
+  }
+  return null;
+}
+// Semanas (lunes a domingo) de un mes 'AAAA-MM'; null = hueco
+function semanasMes(mes) {
+  const [y, m] = mes.split('-').map(Number);
+  const primero = new Date(y, m - 1, 1), total = new Date(y, m, 0).getDate();
+  const celdas = Array((primero.getDay() + 6) % 7).fill(null);
+  for (let d = 1; d <= total; d++) celdas.push(`${mes}-${String(d).padStart(2, '0')}`);
+  while (celdas.length % 7) celdas.push(null);
+  const out = []; for (let i = 0; i < celdas.length; i += 7) out.push(celdas.slice(i, i + 7));
+  return out;
+}
+const tituloMes = (mes) => `${MESES[+mes.slice(5, 7) - 1]} ${mes.slice(0, 4)}`;
+
+function calHtml(mes, interactivo) {
+  const regla = diasRegla();
+  const filas = semanasMes(mes).map((sem) => `<tr>${sem.map((s) => {
+    if (!s) return '<td></td>';
+    const cls = [regla.has(s) && 'regla', s === fecha && 'hoy'].filter(Boolean).join(' ');
+    const n = +s.slice(8);
+    return interactivo
+      ? `<td><button type="button" data-d="${s}" class="${cls}" aria-pressed="${regla.has(s)}">${n}</button></td>`
+      : `<td class="${cls}">${n}</td>`;
+  }).join('')}</tr>`).join('');
+  return `<table class="caltab"><thead><tr>${['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((d) => `<th>${d}</th>`).join('')}</tr></thead><tbody>${filas}</tbody></table>`;
+}
+function renderCal() {
+  const box = $('[data-cal]', form);
+  if (!box) return;
+  box.innerHTML = `
+    <div class="calhead">
+      <button type="button" class="icon" data-mes="-1" aria-label="Mes anterior">‹</button>
+      <strong>${tituloMes(calMes)}</strong>
+      <button type="button" class="icon" data-mes="1" aria-label="Mes siguiente">›</button>
+    </div>
+    ${calHtml(calMes, true)}
+    <p class="calley"><span class="sw regla"></span> Regla <span class="sw hoy"></span> Día del registro</p>`;
+}
+form.addEventListener('click', (e) => {
+  const mesBtn = e.target.closest('[data-mes]');
+  if (mesBtn) {
+    const [y, m] = calMes.split('-').map(Number);
+    calMes = iso(new Date(y, m - 1 + +mesBtn.dataset.mes, 1)).slice(0, 7);
+    renderCal(); return;
+  }
+  const diaBtn = e.target.closest('[data-d]');
+  if (!diaBtn) return;
+  const regla = diasRegla(), s = diaBtn.dataset.d;
+  regla.has(s) ? regla.delete(s) : regla.add(s);
+  store(cicloKey(), { regla: [...regla].sort() });
+  const c = diaCiclo(fecha);
+  const el = form.elements.ciclo;
+  el.value = c ? c.dia : '';
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  renderCal();
+});
+
 /* ---------- Asistente paso a paso ---------- */
 function showStep(focus = true) {
+  const act = activos(), pos = act.indexOf(step);
   $$('.q', form).forEach((q) => q.classList.toggle('cur', +q.dataset.i === step));
-  $('#stepInfo').textContent = `${step + 1} / ${FIELDS.length}`;
-  $('#back').disabled = step === 0;
-  $('#next').textContent = step === FIELDS.length - 1 ? 'Terminar ✓' : 'Siguiente ›';
-  const done = FIELDS.filter((f) => getVal(f.id)).length;
-  $('#progress > div').style.width = `${(mode === 'wizard' ? (step + 1) / FIELDS.length : done / FIELDS.length) * 100}%`;
+  $('#stepInfo').textContent = `${pos + 1} / ${act.length}`;
+  $('#back').disabled = pos <= 0;
+  $('#next').textContent = pos === act.length - 1 ? 'Terminar ✓' : 'Siguiente ›';
+  const done = act.filter((i) => getVal(FIELDS[i].id)).length;
+  $('#progress > div').style.width = `${(mode === 'wizard' ? (pos + 1) / act.length : done / act.length) * 100}%`;
   if (mode === 'wizard' && focus) {
     const el = form.querySelector('.q.cur input:not([type=radio]), .q.cur textarea');
     if (el) setTimeout(() => el.focus({ preventScroll: true }), 50);
@@ -344,8 +439,11 @@ function showStep(focus = true) {
   }
 }
 function go(i) {
+  const dir = i >= step ? 1 : -1;
+  while (i >= 0 && i < FIELDS.length && !activo(FIELDS[i])) i += dir; // salta preguntas que no tocan
   if (i >= FIELDS.length) { save(false); toast('¡Registro del día completo! Ya puedes generar el documento.'); return; }
-  step = Math.max(0, Math.min(FIELDS.length - 1, i));
+  if (i < 0) return;
+  step = i;
   showStep();
 }
 $('#next').onclick = () => go(step + 1);
@@ -404,7 +502,7 @@ $('#exportBtn').onclick = () => {
   if (dirty) save(false);
   const all = {};
   for (const d of allDays()) all[d] = load(pre() + d, {});
-  const blob = new Blob([JSON.stringify({ app: 'registro-matrona', version: 2, perfil, nombre: nombrePerfil(), dias: all }, null, 1)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify({ app: 'registro-matrona', version: 2, perfil, nombre: nombrePerfil(), dias: all, ciclo: load(cicloKey(), null) }, null, 1)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `registro-${perfil}-copia-${iso(new Date())}.json`;
@@ -416,6 +514,7 @@ $('#importFile').onchange = async (e) => {
   try {
     const j = JSON.parse(await file.text());
     const dias = j.dias || {};
+    if (j.ciclo && Array.isArray(j.ciclo.regla)) store(cicloKey(), { regla: [...new Set([...diasRegla(), ...j.ciclo.regla])].sort() });
     let n = 0;
     for (const d in dias) if (/^\d{4}-\d{2}-\d{2}$/.test(d)) { store(pre() + d, dias[d]); n++; }
     toast(`Restaurados ${n} días en ${nombrePerfil()}`);
@@ -437,7 +536,7 @@ $('#copyLast').onclick = () => {
   const d = load(pre() + ant, {});
   let n = 0;
   for (const f of FIELDS) {
-    if (f.id === 'dia' || getVal(f.id) || !d[f.id]) continue;
+    if (f.id === 'dia' || f.type === 'ciclo' || getVal(f.id) || !d[f.id]) continue;
     setVal(f.id, d[f.id]); n++;
   }
   if (!getVal('agua') && d.aguaUnidad) setVal('aguaUnidad', d.aguaUnidad);
@@ -466,6 +565,8 @@ function nl(txt) { return txt.replace(/\n/g, '<br>'); }
 function renderDoc() {
   const d = readForm();
   const rows = COMIDAS.map(([mk, mname]) => `<tr><th>${mname}</th>${COLS.map((c) => `<td>${nl(v(d, `${mk}.${c.k}`))}</td>`).join('')}</tr>`).join('');
+  const conCiclo = cicloActivo();
+  const ciclo = conCiclo ? diaCiclo(fecha) : null;
   const caf = d.cafeina;
   const mark = (o) => `<span class="opt${caf === o ? ' sel' : ''}">${o}</span>`;
   $('#doc').innerHTML = `
@@ -477,7 +578,7 @@ function renderDoc() {
       <div class="dcol">Nº Colegiado 15 375</div>
     </header>
     <p class="dline"><b>Nombre:</b> <span class="fill">${esc(nombrePerfil())}</span></p>
-    <p class="dline"><b>Día:</b> ${blank(v(d, 'dia'), 8)} &nbsp; | &nbsp; <b>Fecha:</b> ${fmtFecha(fecha)}</p>
+    <p class="dline"><b>Día:</b> ${blank(v(d, 'dia'), 8)} &nbsp; | &nbsp; <b>Fecha:</b> ${fmtFecha(fecha)}${conCiclo ? ` &nbsp; | &nbsp; <b>Día del ciclo:</b> ${blank(v(d, 'ciclo'), 3)}` : ''}</p>
 
     <h2>Alimentación y digestión</h2>
     <table class="t5">
@@ -498,6 +599,16 @@ function renderDoc() {
       <thead><tr><th>Horas de sueño</th><th>Calidad del sueño</th><th>Nivel de estrés (0–10)</th></tr></thead>
       <tbody><tr><td>${v(d, 'sueno.horas')}</td><td>${v(d, 'sueno.calidad')}</td><td>${v(d, 'estres')}</td></tr></tbody>
     </table>
+${conCiclo ? `
+    <h2>Ciclo menstrual</h2>
+    <div class="ciclo">
+      <div>
+        <p class="dline"><b>Día del ciclo:</b> ${blank(v(d, 'ciclo'), 3)}</p>
+        <p class="dline"><b>Inicio de la última regla:</b> ${blank(ciclo ? fmtFecha(ciclo.inicio) : '', 6)}</p>
+        <p class="calley"><span class="sw regla"></span> Regla &nbsp; <span class="sw hoy"></span> Día del registro</p>
+      </div>
+      <div class="calmini"><div class="calmes">${tituloMes(fecha.slice(0, 7))}</div>${calHtml(fecha.slice(0, 7), false)}</div>
+    </div>` : ''}
 
     <h2>Señales del cuerpo y observaciones</h2>
     <p class="obshint">(Energía, estado de ánimo, dolor pélvico, molestias digestivas, hinchazón, flujo cervical, antojos, etc.)</p>
@@ -548,7 +659,14 @@ $('#pdfBtn').onclick = async () => {
     if (!window.jspdf) await loadScript('lib/jspdf.umd.min.js');
     if (!window.jspdf.jsPDF.API.autoTable) await loadScript('lib/jspdf.plugin.autotable.min.js');
     if (!window.generarPdf) await loadScript('pdf.js');
-    const doc = await generarPdf(readForm(), { nombre: nombrePerfil(), fecha: fmtFecha(fecha), marcaAgua: settings.watermark ? WATERMARK : null });
+    const c = cicloActivo() ? diaCiclo(fecha) : null;
+    const doc = await generarPdf(readForm(), {
+      nombre: nombrePerfil(), fecha: fmtFecha(fecha), marcaAgua: settings.watermark ? WATERMARK : null,
+      ciclo: cicloActivo() ? {
+        inicio: c ? fmtFecha(c.inicio) : '', titulo: tituloMes(fecha.slice(0, 7)), semanas: semanasMes(fecha.slice(0, 7)),
+        regla: diasRegla(), hoy: fecha,
+      } : null,
+    });
     doc.save(`Registro-${nombrePerfil().replace(/ /g, '-')}-${fmtFecha(fecha).replace(/\//g, '-')}.pdf`);
   } catch (err) {
     console.error(err);

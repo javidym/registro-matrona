@@ -64,7 +64,8 @@ function construirPdf(d, info, fs) {
   y += 7 * k;
 
   lineaCampos(doc, [{ label: 'Nombre', value: info.nombre, min: 50 }], y, fs); y += 6 * k;
-  lineaCampos(doc, [{ label: 'Día', value: d.dia, min: 30 }, { label: 'Fecha', value: info.fecha, min: 22 }], y, fs);
+  lineaCampos(doc, [{ label: 'Día', value: d.dia, min: 30 }, { label: 'Fecha', value: info.fecha, min: 22 },
+    ...(info.ciclo ? [{ label: 'Día del ciclo', value: d.ciclo, min: 10 }] : [])], y, fs);
   y += 2 * k;
 
   const seccion = (t) => {
@@ -122,6 +123,45 @@ function construirPdf(d, info, fs) {
   seccion('Descanso y estado nervioso');
   tabla(['Horas de sueño', 'Calidad del sueño', 'Nivel de estrés (0-10)'],
     [[d['sueno.horas'], d['sueno.calidad'], d.estres].map((x) => x || '')], 8 * k);
+
+  if (info.ciclo) {
+    const ci = info.ciclo;
+    seccion('Ciclo menstrual');
+    // Calendario del mes a la derecha
+    const cw = 6.2 * k, ch = 4.3 * k, x0 = PDF_W - PDF_M - 7 * cw;
+    let cy = y + 3.2 * k;
+    doc.setFont('times', 'bold'); doc.setFontSize(fs); doc.setTextColor(...PDF_C.rosa);
+    doc.text(ci.titulo, x0 + 3.5 * cw, cy, { align: 'center' });
+    cy += 1.2 * k;
+    doc.setFontSize(fs - 1.5);
+    ['L', 'M', 'X', 'J', 'V', 'S', 'D'].forEach((l, i) => {
+      doc.setFillColor(...PDF_C.beige); doc.rect(x0 + i * cw, cy, cw, ch, 'F');
+      doc.setTextColor(...PDF_C.tinta); doc.text(l, x0 + i * cw + cw / 2, cy + ch * 0.7, { align: 'center' });
+    });
+    cy += ch;
+    doc.setFont('helvetica', 'normal');
+    ci.semanas.forEach((sem) => {
+      sem.forEach((s, i) => {
+        const cx = x0 + i * cw;
+        doc.setDrawColor(...PDF_C.borde); doc.setLineWidth(0.15); doc.rect(cx, cy, cw, ch);
+        if (!s) return;
+        if (ci.regla.has(s)) { doc.setFillColor(...PDF_C.rosa); doc.rect(cx, cy, cw, ch, 'F'); doc.setTextColor(255, 255, 255); }
+        else doc.setTextColor(...PDF_C.tinta);
+        if (s === ci.hoy) { doc.setDrawColor(...PDF_C.tinta); doc.setLineWidth(0.5); doc.rect(cx + 0.3, cy + 0.3, cw - 0.6, ch - 0.6); }
+        doc.text(String(+s.slice(8)), cx + cw / 2, cy + ch * 0.72, { align: 'center' });
+      });
+      cy += ch;
+    });
+    // Datos a la izquierda
+    let ty = y + 4 * k;
+    lineaCampos(doc, [{ label: 'Día del ciclo', value: d.ciclo, min: 14 }], ty, fs); ty += 6 * k;
+    lineaCampos(doc, [{ label: 'Inicio de la última regla', value: ci.inicio, min: 24 }], ty, fs); ty += 6 * k;
+    doc.setFillColor(...PDF_C.rosa); doc.rect(PDF_M, ty - 2.6, 3.5, 3, 'F');
+    doc.setDrawColor(...PDF_C.tinta); doc.setLineWidth(0.5); doc.rect(PDF_M + 22, ty - 2.6, 3.5, 3);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(fs - 0.5); doc.setTextColor(...PDF_C.suave);
+    doc.text('Regla', PDF_M + 5, ty); doc.text('Día del registro', PDF_M + 27, ty);
+    y = Math.max(cy, ty) + 1;
+  }
 
   seccion('Señales del cuerpo y observaciones');
   doc.setFont('times', 'italic'); doc.setFontSize(fs - 0.5); doc.setTextColor(...PDF_C.suave);
