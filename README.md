@@ -5,7 +5,7 @@ App web sencilla para rellenar cada día el registro de alimentación, movimient
 - **Perfiles** Javier Alcaraz y Noelia Herreros (selector arriba): cada uno con sus días, sugerencias y copia de seguridad; el nombre sale en el documento.
 - **Paso a paso** (una pregunta cada vez) o **Todo junto** (formulario completo).
 - Autoguardado por día en el propio móvil (localStorage) + botón *Guardar*. Los datos no salen del dispositivo.
-- Sugerencias con lo que más/últimamente has escrito en cada campo.
+- Sugerencias con lo que más/últimamente has escrito (las comidas comparten sugerencias entre sí) y, en el menú ⋯, *Copiar del último día* para rellenar los campos vacíos.
 - *Generar documento* → *Imprimir / Guardar PDF* o *Descargar PDF*.
 - Menú ⋯: marca de agua, copia de seguridad (descargar/restaurar) y vaciar el día.
 

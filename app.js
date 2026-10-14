@@ -204,6 +204,7 @@ function save(manual) {
   if (isEmpty(data) && !manual) { try { localStorage.removeItem(key); } catch { /* */ } }
   else { data.actualizado = new Date().toISOString(); if (!store(key, data)) { setState('⚠ No se pudo guardar', true); return; } }
   dirty = false; suggestCache = null;
+  renderChips();
   const t = new Date();
   setState(`Guardado ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`);
   if (manual) toast('Guardado ✓');
@@ -240,31 +241,40 @@ $('#fecha').addEventListener('change', (e) => { if (e.target.value) openDay(e.ta
 $('#prevDay').onclick = () => { const d = parseIso(fecha); d.setDate(d.getDate() - 1); openDay(iso(d)); };
 $('#nextDay').onclick = () => { const d = parseIso(fecha); d.setDate(d.getDate() + 1); openDay(iso(d)); };
 
-/* ---------- Sugerencias a partir de días anteriores ---------- */
+/* ---------- Sugerencias a partir de días anteriores (y de hoy) ---------- */
+// Las columnas de comidas comparten sugerencias (lo escrito en la comida sirve para la cena)
+function grupo(id) {
+  const m = id.match(/^(desayuno|mediamanana|comida|merienda|cena)\.(.+)$/);
+  return m ? 'col:' + m[2] : id;
+}
 function buildSuggest() {
-  const stats = {};
-  const days = allDays().filter((d) => d !== fecha);
+  const days = allDays();
+  if (!days.includes(fecha)) days.push(fecha);
+  days.sort();
+  const fuentes = {};
   days.forEach((day, idx) => {
-    const d = load(pre() + day, {});
+    const d = day === fecha ? readForm() : load(pre() + day, {});
+    const r = (idx + 1) / days.length; // más reciente = más peso
     for (const f of FIELDS) {
       if (f.type === 'choice' || f.type === 'scale' || f.type === 'number' || f.type === 'agua' || f.id === 'dia') continue;
       const v = d[f.id]; if (!v) continue;
       const items = f.split ? v.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean) : [v.trim()];
-      const bucket = stats[f.id] || (stats[f.id] = {});
       for (const it of items) {
         if (it.length > 60) continue;
-        const k = it.toLowerCase();
-        const s = bucket[k] || (bucket[k] = { text: it, n: 0, last: 0 });
-        s.n++; s.last = Math.max(s.last, idx + 1); s.text = it;
+        (fuentes[grupo(f.id)] ||= []).push({ id: f.id, text: it, k: it.toLowerCase(), r, hoy: day === fecha });
       }
     }
   });
-  const total = days.length || 1;
   const out = {};
-  for (const id in stats) {
-    out[id] = Object.values(stats[id])
-      .sort((a, b) => (b.n + 2 * b.last / total) - (a.n + 2 * a.last / total))
-      .map((s) => s.text);
+  for (const f of FIELDS) {
+    const src = fuentes[grupo(f.id)]; if (!src) continue;
+    const sc = {};
+    for (const s of src) {
+      if (s.hoy && s.id === f.id) continue; // lo que ya está escrito hoy en este campo
+      const e = (sc[s.k] ||= { text: s.text, p: 0 });
+      e.p += (s.id === f.id ? 2 : 1) * (1 + s.r);
+    }
+    out[f.id] = Object.values(sc).sort((a, b) => b.p - a.p).map((e) => e.text);
   }
   return out;
 }
@@ -275,11 +285,14 @@ function renderChips(onlyId) {
     if (onlyId && f.id !== onlyId) continue;
     const box = form.querySelector(`.chips[data-for="${CSS.escape(f.id)}"]`);
     if (!box) continue;
+    // no sugerir lo que ya está escrito en el campo
+    const cur = getVal(f.id).toLowerCase();
+    const ya = new Set(f.split ? cur.split(/[,;\n]+/).map((s) => s.trim()) : [cur.trim()]);
     let html = '';
     if (f.prefixes) html += f.prefixes.map((p) => `<button type="button" class="chip pre" data-pre="${esc(p)}">+ ${esc(p)}</button>`).join('');
-    const prev = suggestCache[f.id] || [];
+    const prev = (suggestCache[f.id] || []).filter((s) => !ya.has(s.toLowerCase())).slice(0, 10);
     const seen = new Set(prev.map((s) => s.toLowerCase()));
-    const list = prev.slice(0, 8).concat((f.defaults || []).filter((d) => !seen.has(d.toLowerCase()))).slice(0, 10);
+    const list = prev.concat((f.defaults || []).filter((d) => !seen.has(d.toLowerCase()) && !ya.has(d.toLowerCase()))).slice(0, 12);
     html += list.map((s, i) => `<button type="button" class="chip${i < prev.length ? ' hist' : ''}" data-v="${esc(s)}">${esc(s)}</button>`).join('');
     box.innerHTML = html;
   }
@@ -418,6 +431,21 @@ $('#clearDay').onclick = () => {
   openDay(fecha);
   dlg.close();
 };
+$('#copyLast').onclick = () => {
+  const ant = allDays().filter((d) => d < fecha).pop();
+  if (!ant) { toast('No hay días anteriores guardados'); return; }
+  const d = load(pre() + ant, {});
+  let n = 0;
+  for (const f of FIELDS) {
+    if (f.id === 'dia' || getVal(f.id) || !d[f.id]) continue;
+    setVal(f.id, d[f.id]); n++;
+  }
+  if (!getVal('agua') && d.aguaUnidad) setVal('aguaUnidad', d.aguaUnidad);
+  autosize();
+  save(false);
+  toast(n ? `Copiados ${n} campos del ${fmtFecha(ant)}` : 'No había campos vacíos que copiar');
+  dlg.close();
+};
 $('#saveBtn').onclick = () => save(true);
 
 /* ---------- Documento ---------- */
@@ -442,6 +470,7 @@ function renderDoc() {
   const mark = (o) => `<span class="opt${caf === o ? ' sel' : ''}">${o}</span>`;
   $('#doc').innerHTML = `
     ${settings.watermark ? WATERMARK : ''}
+    <div class="a4in">
     <header class="dh">
       <div class="dname">Vanesa Ballester</div>
       <div class="drole">Matrona Integrativa</div>
@@ -472,7 +501,8 @@ function renderDoc() {
 
     <h2>Señales del cuerpo y observaciones</h2>
     <p class="obshint">(Energía, estado de ánimo, dolor pélvico, molestias digestivas, hinchazón, flujo cervical, antojos, etc.)</p>
-    <div class="obs">${nl(v(d, 'observaciones'))}</div>`;
+    <div class="obs">${nl(v(d, 'observaciones'))}</div>
+    </div>`;
 }
 
 function showDoc(on) {
@@ -482,21 +512,27 @@ function showDoc(on) {
   if (on) fitDoc();
   window.scrollTo({ top: 0 });
 }
-// En pantallas estrechas el A4 se ve escalado para que quepa
+// La hoja mide siempre un A4: si el contenido no cabe, se encoge el contenido (nunca hay 2.ª página).
+// Además, en pantallas estrechas la hoja entera se ve escalada para que quepa a lo ancho.
 function fitDoc() {
-  const el = $('#doc');
+  const el = $('#doc'), inner = $('.a4in', el);
   el.style.zoom = 1;
+  const cs = getComputedStyle(el);
+  const altoUtil = el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  const anchoUtil = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const cabe = (z) => {
+    inner.style.zoom = z; inner.style.width = anchoUtil / z + 'px';
+    return inner.getBoundingClientRect().height <= altoUtil; // tamaño ya encogido
+  };
+  if (!cabe(1)) { // búsqueda del mayor tamaño que cabe
+    let lo = 0.3, hi = 1;
+    for (let i = 0; i < 9; i++) { const m = (lo + hi) / 2; if (cabe(m)) lo = m; else hi = m; }
+    cabe(lo);
+  }
   el.style.zoom = Math.min(1, (document.documentElement.clientWidth - 8) / el.offsetWidth);
 }
 window.addEventListener('resize', () => { if (!$('#docView').hidden) fitDoc(); });
-// Al imprimir, el documento se encoge si hace falta para que quepa en una sola cara A4
-window.addEventListener('beforeprint', () => {
-  const el = $('#doc');
-  el.style.zoom = 1;
-  const alto = el.scrollHeight, a4 = el.offsetWidth * 297 / 210;
-  el.style.zoom = alto > a4 - 10 ? (a4 * 0.97) / alto : 1;
-});
-window.addEventListener('afterprint', () => { if (!$('#docView').hidden) fitDoc(); });
+window.addEventListener('beforeprint', () => { if (!$('#docView').hidden) fitDoc(); });
 $('#genBtn').onclick = () => showDoc(true);
 $('#docBack').onclick = () => showDoc(false);
 $('#printBtn').onclick = () => { document.title = `Registro ${nombrePerfil()} ${fmtFecha(fecha).replace(/\//g, '-')}`; window.print(); };

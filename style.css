@@ -143,12 +143,13 @@ dialog button, .filebtn { display: block; width: 100%; margin: 8px 0; text-align
 
 .a4 {
   position: relative; overflow: hidden; background: #fff; color: #3d302c;
-  width: 210mm; min-height: 297mm; margin: 0 auto; padding: 11mm 13mm 9mm;
+  width: 210mm; height: 297mm; margin: 0 auto; padding: 11mm 13mm 9mm;
   font-family: Georgia, "Times New Roman", serif; font-size: 10.5pt; line-height: 1.35;
   box-shadow: 0 2px 14px rgba(0, 0, 0, .15);
 }
 @media screen and (max-width: 840px) { .docscroll { padding: 12px 0; } }
 .a4 > * { position: relative; z-index: 1; }
+.a4in { width: 100%; }
 .a4 .wm { position: absolute; z-index: 0; left: 50%; top: 50%; width: 125mm; transform: translate(-50%, -45%); opacity: .55; pointer-events: none; }
 .dh { text-align: center; margin-bottom: 5mm; }
 .dname { font-size: 20pt; color: #b77a7f; letter-spacing: .02em; }
@@ -180,10 +181,11 @@ dialog button, .filebtn { display: block; width: 100%; margin: 8px 0; text-align
 /* ---------- Impresión ---------- */
 @page { size: A4; margin: 0; }
 @media print {
-  html, body, #docView { background: #fff !important; }
+  html, body, #docView { background: #fff !important; min-height: 0 !important; height: auto; margin: 0; }
   #app, .doctools, #toast { display: none !important; }
   #docView { display: block !important; }
   .docscroll { padding: 0; overflow: visible; }
-  .a4 { box-shadow: none; margin: 0; width: 210mm; min-height: 286mm; page-break-after: avoid; }
+  /* algo más pequeña que el papel para que nunca salte a una 2.ª hoja aunque el navegador añada márgenes */
+  .a4 { box-shadow: none; margin: 0 auto; zoom: .94 !important; break-after: avoid; break-inside: avoid; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }

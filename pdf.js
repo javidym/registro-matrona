@@ -150,6 +150,7 @@ async function generarPdf(d, info) {
   let r;
   for (let fs = 9; fs >= 5; fs -= 0.5) { r = construirPdf(d, info, fs); if (r.cabe) break; }
   const doc = r.doc;
+  while (doc.getNumberOfPages() > 1) doc.deletePage(doc.getNumberOfPages()); // siempre una sola cara
   if (info.marcaAgua) {
     const png = await marcaAguaPng(info.marcaAgua);
     if (png) {
